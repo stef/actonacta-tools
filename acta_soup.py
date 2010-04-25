@@ -5,31 +5,40 @@ from BeautifulSoup import BeautifulSoup, HTMLParseError
 from StringIO import StringIO as io
 from wikitools import wiki
 from wikitools import category
+from password import USER, PASSWORD
 
-#page = urllib2.urlopen("http://www.europarl.europa.eu/sides/getDoc.do?pubRef=-//EP//TEXT+TA+P7-TA-2010-0058+0+DOC+XML+V0//EN&language=EN")
-page = urllib2.urlopen("file:///Users/olle/Desktop/acta.html")
-try:
-    soup = BeautifulSoup(page)
-except HTMLParseError, e:
-    exit("Unable to fetch the thing.")
-    
-titleBoxes = soup.findAll('tr', attrs={'class':'doc_title'})
-titleBlock = titleBoxes.pop() # The last box is the one we want
-headline = titleBlock.find('td', attrs={"align":"left", "valign":"top"})
-headLineText = headline.next.next.next.next
-headlineText = headLineText.strip()
+LANGS=['bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fi', 'fr', 'hu', 'it', 'lt', 'lv', 'mt', 'nl', 'pl', 'pt', 'ro', 'sk', 'sl', 'sv', 'en']
 
-pageContents = u''
-pageContents += unicode(headlineText) + u"\n"
-for piece in soup.find('tr', attrs={'class':'contents'}).next:
-    pageContents += unicode(piece).strip()
+def getPage(url,lang):
+    page = urllib2.urlopen(url % (lang.upper(),lang.upper()))
+    try:
+        soup = BeautifulSoup(page)
+    except HTMLParseError, e:
+        print "Unable to fetch", lang, "version of", url
 
-#print pageContents
+    titleBoxes = soup.findAll('tr', attrs={'class':'doc_title'})
+    titleBlock = titleBoxes.pop() # The last box is the one we want
+    headline = titleBlock.find('td', attrs={"align":"left", "valign":"top"})
+    headLineText = headline.next.next.next.next
+    headlineText = headLineText.strip()
 
-# TODO: Login!
-site = wiki.Wiki("http://euwiki.org/api.php")
-cat = category.Category(site, "Foo") # Create object for "Category:Foo"
-# iterate through all the pages in ns 0
-for article in cat.getAllMembersGen(namespaces=[0]):
-    article.edit(prependtext=pageContents) # edit each page
+    pageContents = u''
+    pageContents += unicode(headlineText) + u"\n"
+    for piece in soup.find('tr', attrs={'class':'contents'}).next:
+        pageContents += unicode(piece).strip()
 
+    return (headlineText, pageContents)
+
+for lang in LANGS:
+    # get the content to be loaded
+    title,content=getPage("http://www.europarl.europa.eu/sides/getDoc.do?pubRef=-//EP//TEXT+TA+P7-TA-2010-0058+0+DOC+XML+V0//%s&language=%s",lang)
+    # add intertiki multilanguage header
+    interwikiHeader=['[['+lng+':]]' for lng in LANGS if not lng==lang]
+    content=' '.join(interwikiHeader)+'\n\n'+content
+
+    print title.encode('utf8')
+    print content.encode('utf8')
+
+    # connect to the site to be imported into
+    #site = wiki.Wiki("http://"+lang+".act-on-acta.eu/api.php")
+    #site.login(USER, password=PASSWORD)
